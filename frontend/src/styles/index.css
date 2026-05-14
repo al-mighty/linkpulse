@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pulse-primary: #6366F1;
+  --color-pulse-dark: #4338CA;
+  --color-pulse-light: #EEF2FF;
+  --color-pulse-bg: #FAFBFC;
+  --color-pulse-surface: #FFFFFF;
+  --color-pulse-text: #1E293B;
+  --color-pulse-muted: #64748B;
+  --color-pulse-success: #10B981;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-pulse-bg);
+  color: var(--color-pulse-text);
+  margin: 0;
+}
