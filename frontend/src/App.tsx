@@ -19,7 +19,7 @@ interface Stats {
   top_countries: { key: string; count: number }[] | null;
 }
 
-const API = "/api";
+const API = "/linkpulse/api";
 
 export default function App() {
   const [url, setUrl] = useState("");
