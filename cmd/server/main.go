@@ -62,21 +62,40 @@ func main() {
 		AllowedHeaders: []string{"Content-Type"},
 	}))
 
-	r.Get("/api/health", h.Health)
-	r.Post("/api/links", h.CreateLink)
-	r.Get("/api/links", h.ListLinks)
-	r.Get("/api/links/{code}/stats", h.GetStats)
-	// Serve frontend static files
+	// Static files dir
 	staticDir := "/static"
 	if _, err := os.Stat("frontend/dist"); err == nil {
 		staticDir = "frontend/dist"
 	}
-	fileServer := http.FileServer(http.Dir(staticDir))
-	r.Get("/app/*", http.StripPrefix("/app", fileServer).ServeHTTP)
+
+	r.Get("/api/health", h.Health)
+	r.Post("/api/links", h.CreateLink)
+	r.Get("/api/links", h.ListLinks)
+	r.Get("/api/links/{code}/stats", h.GetStats)
+
+	// Frontend: serve index.html for /app, static assets for /app/*
 	r.Get("/app", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, staticDir+"/index.html")
 	})
+	r.Get("/app/*", func(w http.ResponseWriter, r *http.Request) {
+		// Try static file first, fallback to index.html (SPA)
+		path := staticDir + r.URL.Path[4:] // strip "/app"
+		if _, err := os.Stat(path); err == nil {
+			http.StripPrefix("/app", http.FileServer(http.Dir(staticDir))).ServeHTTP(w, r)
+			return
+		}
+		http.ServeFile(w, r, staticDir+"/index.html")
+	})
 
+	// Also serve assets from root /assets/ (when behind reverse proxy stripping prefix)
+	r.Get("/assets/*", http.FileServer(http.Dir(staticDir)).ServeHTTP)
+
+	// Root serves frontend
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, staticDir+"/index.html")
+	})
+
+	// Short link redirect — must be last
 	r.Get("/{code}", h.Redirect)
 
 	// Server
