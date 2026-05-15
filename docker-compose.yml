@@ -31,7 +31,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    networks:
+      - default
+      - cheslav-net
     restart: unless-stopped
 
 volumes:
   pgdata:
+
+networks:
+  cheslav-net:
+    external: true
