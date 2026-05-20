@@ -48,3 +48,19 @@ jobs:
             -d "text=$MSG" \
             -d "parse_mode=Markdown" \
             -d "disable_web_page_preview=true"
+
+      - name: Notify n8n (LinkedIn draft pipeline)
+        if: success() && env.N8N_LINKEDIN_WEBHOOK != ''
+        env:
+          N8N_LINKEDIN_WEBHOOK: ${{ secrets.N8N_LINKEDIN_WEBHOOK }}
+        run: |
+          COMMITS_JSON=$(git log -5 --format='%s' | jq -R . | jq -s -c .)
+          PAYLOAD=$(jq -c -n \
+            --arg project "linkpulse" \
+            --arg repo "https://github.com/${{ github.repository }}" \
+            --arg deploy "https://cheslav.space/linkpulse/" \
+            --argjson commits "$COMMITS_JSON" \
+            '{project:$project, repo_url:$repo, deploy_url:$deploy, commits:$commits}')
+          curl -fsS -X POST "$N8N_LINKEDIN_WEBHOOK" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD" || true
