@@ -12,10 +12,18 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    networks:
+      default:
+        aliases:
+          - lp-db
 
   redis:
     image: redis:7-alpine
     command: redis-server --maxmemory 32mb --maxmemory-policy allkeys-lru
+    networks:
+      default:
+        aliases:
+          - lp-redis
 
   app:
     build: .
