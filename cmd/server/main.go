@@ -49,7 +49,8 @@ func main() {
 	pg := repo.NewPostgres(pool)
 	cache := repo.NewRedis(rdb)
 	svc := service.NewLinkService(pg, cache, os.Getenv("BASE_URL"))
-	h := handler.New(svc)
+	events := service.NewEventService(pg)
+	h := handler.New(svc, events)
 
 	// Router
 	r := chi.NewRouter()
@@ -72,6 +73,8 @@ func main() {
 	r.Post("/api/links", h.CreateLink)
 	r.Get("/api/links", h.ListLinks)
 	r.Get("/api/links/{code}/stats", h.GetStats)
+	r.Post("/api/events", h.TrackEvent)
+	r.Get("/api/events/stats", h.EventStats)
 
 	// Frontend: serve index.html for /app, static assets for /app/*
 	r.Get("/app", func(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +155,22 @@ func migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		);
 		CREATE INDEX IF NOT EXISTS idx_clicks_link_id ON clicks(link_id);
 		CREATE INDEX IF NOT EXISTS idx_clicks_created ON clicks(created_at);
+
+		CREATE TABLE IF NOT EXISTS events (
+			id BIGSERIAL PRIMARY KEY,
+			project VARCHAR(64) NOT NULL,
+			name VARCHAR(128) NOT NULL,
+			page TEXT,
+			payload JSONB,
+			ip VARCHAR(45),
+			user_agent TEXT,
+			referer TEXT,
+			country VARCHAR(2),
+			created_at TIMESTAMPTZ DEFAULT NOW()
+		);
+		CREATE INDEX IF NOT EXISTS idx_events_project ON events(project);
+		CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
+		CREATE INDEX IF NOT EXISTS idx_events_proj_name ON events(project, name);
 	`)
 	return err
 }

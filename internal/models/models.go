@@ -46,3 +46,32 @@ type CreateLinkResp struct {
 	ShortURL string `json:"short_url"`
 	URL      string `json:"url"`
 }
+
+type Event struct {
+	ID        int64                  `json:"id"`
+	Project   string                 `json:"project"`
+	Name      string                 `json:"name"`
+	Page      string                 `json:"page,omitempty"`
+	Payload   map[string]interface{} `json:"payload,omitempty"`
+	IP        string                 `json:"ip,omitempty"`
+	UserAgent string                 `json:"user_agent,omitempty"`
+	Referer   string                 `json:"referer,omitempty"`
+	Country   string                 `json:"country,omitempty"`
+	CreatedAt time.Time              `json:"created_at"`
+}
+
+type TrackEventReq struct {
+	Project string                 `json:"project"`
+	Name    string                 `json:"name"`
+	Page    string                 `json:"page,omitempty"`
+	Payload map[string]interface{} `json:"payload,omitempty"`
+}
+
+type EventStats struct {
+	Total        int64     `json:"total"`
+	EventsByDay  []DayStat `json:"events_by_day"`
+	TopEvents    []KVStat  `json:"top_events"`
+	TopProjects  []KVStat  `json:"top_projects"`
+	TopPages     []KVStat  `json:"top_pages"`
+	TopCountries []KVStat  `json:"top_countries"`
+}

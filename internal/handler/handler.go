@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/al-mighty/linkpulse/internal/models"
 	"github.com/al-mighty/linkpulse/internal/service"
@@ -10,11 +11,12 @@ import (
 )
 
 type Handler struct {
-	svc *service.LinkService
+	svc    *service.LinkService
+	events *service.EventService
 }
 
-func New(svc *service.LinkService) *Handler {
-	return &Handler{svc: svc}
+func New(svc *service.LinkService, events *service.EventService) *Handler {
+	return &Handler{svc: svc, events: events}
 }
 
 func (h *Handler) CreateLink(w http.ResponseWriter, r *http.Request) {
@@ -76,4 +78,43 @@ func (h *Handler) GetStats(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"status":"ok"}`))
+}
+
+// TrackEvent: POST /api/events  body: {project, name, page?, payload?}
+// Fast path — enqueues to a channel and returns 202.
+func (h *Handler) TrackEvent(w http.ResponseWriter, r *http.Request) {
+	var req models.TrackEventReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid json"}`, http.StatusBadRequest)
+		return
+	}
+	ev := &models.Event{
+		Project:   req.Project,
+		Name:      req.Name,
+		Page:      req.Page,
+		Payload:   req.Payload,
+		IP:        r.RemoteAddr,
+		UserAgent: r.UserAgent(),
+		Referer:   r.Referer(),
+	}
+	if err := h.events.Track(ev); err != nil {
+		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	w.Write([]byte(`{"status":"ok"}`))
+}
+
+// EventStats: GET /api/events/stats?project=X&since=30
+func (h *Handler) EventStats(w http.ResponseWriter, r *http.Request) {
+	project := r.URL.Query().Get("project")
+	sinceDays, _ := strconv.Atoi(r.URL.Query().Get("since"))
+	stats, err := h.events.Stats(r.Context(), project, sinceDays)
+	if err != nil {
+		http.Error(w, `{"error":"failed to read stats"}`, http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(stats)
 }

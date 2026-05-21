@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/al-mighty/linkpulse/internal/models"
@@ -131,4 +132,117 @@ func (p *Postgres) GetLinkStats(ctx context.Context, code string) (*models.LinkS
 	}
 
 	return stats, nil
+}
+
+// ====== Events ======
+
+func (p *Postgres) InsertEvent(ctx context.Context, e *models.Event) error {
+	var payloadJSON []byte
+	if e.Payload != nil {
+		b, err := json.Marshal(e.Payload)
+		if err != nil {
+			return fmt.Errorf("marshal payload: %w", err)
+		}
+		payloadJSON = b
+	}
+	_, err := p.pool.Exec(ctx,
+		`INSERT INTO events (project, name, page, payload, ip, user_agent, referer, country)
+		 VALUES ($1, $2, NULLIF($3, ''), $4, NULLIF($5, ''), NULLIF($6, ''), NULLIF($7, ''), NULLIF($8, ''))`,
+		e.Project, e.Name, e.Page, payloadJSON, e.IP, e.UserAgent, e.Referer, e.Country,
+	)
+	if err != nil {
+		return fmt.Errorf("insert event: %w", err)
+	}
+	return nil
+}
+
+// EventStats returns aggregates for the events table, filtered by project and
+// time window. If project is empty, all projects are aggregated.
+func (p *Postgres) EventStats(ctx context.Context, project string, sinceDays int) (*models.EventStats, error) {
+	if sinceDays <= 0 {
+		sinceDays = 30
+	}
+	stats := &models.EventStats{}
+
+	// Build optional project filter
+	filter := ""
+	args := []interface{}{sinceDays}
+	if project != "" {
+		filter = " AND project = $2"
+		args = append(args, project)
+	}
+
+	// total
+	err := p.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM events WHERE created_at >= NOW() - ($1 || ' days')::interval`+filter,
+		args...,
+	).Scan(&stats.Total)
+	if err != nil {
+		return nil, fmt.Errorf("total: %w", err)
+	}
+
+	// events by day
+	rows, err := p.pool.Query(ctx,
+		`SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') d, COUNT(*) c
+		 FROM events
+		 WHERE created_at >= NOW() - ($1 || ' days')::interval`+filter+`
+		 GROUP BY d ORDER BY d`,
+		args...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("by day: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var d models.DayStat
+		if err := rows.Scan(&d.Date, &d.Count); err != nil {
+			return nil, err
+		}
+		stats.EventsByDay = append(stats.EventsByDay, d)
+	}
+
+	// top events
+	stats.TopEvents = p.topN(ctx, "name", sinceDays, project, 10)
+	// top projects (only when no project filter)
+	if project == "" {
+		stats.TopProjects = p.topN(ctx, "project", sinceDays, "", 10)
+	}
+	// top pages
+	stats.TopPages = p.topN(ctx, "page", sinceDays, project, 10)
+	// top countries
+	stats.TopCountries = p.topN(ctx, "country", sinceDays, project, 10)
+
+	return stats, nil
+}
+
+// topN groups events by the given column over the window. Skips NULL/empty values.
+// `col` is interpolated unsafely — caller must pass a trusted column name.
+func (p *Postgres) topN(ctx context.Context, col string, sinceDays int, project string, limit int) []models.KVStat {
+	filter := ""
+	args := []interface{}{sinceDays, limit}
+	if project != "" {
+		filter = " AND project = $3"
+		args = append(args, project)
+	}
+	q := fmt.Sprintf(
+		`SELECT %s::text AS k, COUNT(*) c
+		 FROM events
+		 WHERE created_at >= NOW() - ($1 || ' days')::interval
+		   AND %s IS NOT NULL AND %s <> ''`+filter+`
+		 GROUP BY k ORDER BY c DESC LIMIT $2`,
+		col, col, col,
+	)
+	rows, err := p.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	out := []models.KVStat{}
+	for rows.Next() {
+		var s models.KVStat
+		if err := rows.Scan(&s.Key, &s.Count); err == nil {
+			out = append(out, s)
+		}
+	}
+	return out
 }
