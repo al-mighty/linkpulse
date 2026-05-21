@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -112,6 +113,7 @@ func (h *Handler) EventStats(w http.ResponseWriter, r *http.Request) {
 	sinceDays, _ := strconv.Atoi(r.URL.Query().Get("since"))
 	stats, err := h.events.Stats(r.Context(), project, sinceDays)
 	if err != nil {
+		log.Printf("event stats: %v", err)
 		http.Error(w, `{"error":"failed to read stats"}`, http.StatusInternalServerError)
 		return
 	}
