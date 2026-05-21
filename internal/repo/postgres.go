@@ -174,7 +174,7 @@ func (p *Postgres) EventStats(ctx context.Context, project string, sinceDays int
 
 	// total
 	err := p.pool.QueryRow(ctx,
-		`SELECT COUNT(*) FROM events WHERE created_at >= NOW() - ($1 || ' days')::interval`+filter,
+		`SELECT COUNT(*) FROM events WHERE created_at >= NOW() - ($1::text || ' days')::interval`+filter,
 		args...,
 	).Scan(&stats.Total)
 	if err != nil {
@@ -185,7 +185,7 @@ func (p *Postgres) EventStats(ctx context.Context, project string, sinceDays int
 	rows, err := p.pool.Query(ctx,
 		`SELECT TO_CHAR(created_at::date, 'YYYY-MM-DD') d, COUNT(*) c
 		 FROM events
-		 WHERE created_at >= NOW() - ($1 || ' days')::interval`+filter+`
+		 WHERE created_at >= NOW() - ($1::text || ' days')::interval`+filter+`
 		 GROUP BY d ORDER BY d`,
 		args...,
 	)
@@ -227,7 +227,7 @@ func (p *Postgres) topN(ctx context.Context, col string, sinceDays int, project 
 	q := fmt.Sprintf(
 		`SELECT %s::text AS k, COUNT(*) c
 		 FROM events
-		 WHERE created_at >= NOW() - ($1 || ' days')::interval
+		 WHERE created_at >= NOW() - ($1::text || ' days')::interval
 		   AND %s IS NOT NULL AND %s <> ''`+filter+`
 		 GROUP BY k ORDER BY c DESC LIMIT $2`,
 		col, col, col,
