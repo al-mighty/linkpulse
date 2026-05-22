@@ -93,6 +93,17 @@ func main() {
 	// Also serve assets from root /assets/ (when behind reverse proxy stripping prefix)
 	r.Get("/assets/*", http.FileServer(http.Dir(staticDir)).ServeHTTP)
 
+	// Root-level static files. These must be declared before the
+	// `/{code}` catch-all, otherwise chi treats `track.js` as a short
+	// code and the redirect handler 404s. Listed explicitly so we
+	// never accidentally shadow a legitimate short code.
+	for _, name := range []string{"track.js", "favicon.ico", "robots.txt"} {
+		file := staticDir + "/" + name
+		r.Get("/"+name, func(w http.ResponseWriter, req *http.Request) {
+			http.ServeFile(w, req, file)
+		})
+	}
+
 	// Root serves frontend
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, staticDir+"/index.html")
