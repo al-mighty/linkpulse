@@ -16,6 +16,7 @@ services:
       default:
         aliases:
           - lp-db
+    restart: always
 
   redis:
     image: redis:7-alpine
@@ -24,6 +25,7 @@ services:
       default:
         aliases:
           - lp-redis
+    restart: always
 
   app:
     build: .
@@ -42,7 +44,7 @@ services:
     networks:
       - default
       - cheslav-net
-    restart: unless-stopped
+    restart: always
 
 volumes:
   pgdata:
