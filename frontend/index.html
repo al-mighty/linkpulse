@@ -10,7 +10,9 @@
   <div id="root"></div>
   <script type="module" src="/src/main.tsx"></script>
   <script async src="https://cheslav.space/survivors/feedback/widget.js" data-project="linkpulse"></script>
-  <script async src="https://cheslav.space/metrika.js"></script>
+  <!-- data-mode="spa" — loader skips its auto-hit; App.tsx fires ym hit
+       on each react-router navigation so SPA routes are tracked. -->
+  <script async src="https://cheslav.space/metrika.js" data-mode="spa"></script>
   <script async src="https://cheslav.space/linkpulse/track.js" data-project="linkpulse"></script>
 </body>
 </html>

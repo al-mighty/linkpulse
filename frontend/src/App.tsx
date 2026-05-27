@@ -41,6 +41,16 @@ export default function App() {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Yandex Metrika pageview. The shared metrika.js loader has data-mode
+  // ="spa" so it skips its own initial hit — we send it once here on
+  // mount instead. App-internal tab switches are not separate URLs in
+  // Metrika's model so a single hit per visit is the right granularity.
+  useEffect(() => {
+    if (typeof window !== "undefined" && typeof (window as any).ym === "function") {
+      (window as any).ym(109033343, "hit", window.location.pathname + window.location.search);
+    }
+  }, []);
+
   async function loadLinks() {
     const resp = await fetch(`${API}/links`);
     setLinks(await resp.json());
